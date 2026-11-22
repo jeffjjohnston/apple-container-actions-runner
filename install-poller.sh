@@ -36,7 +36,7 @@ esac
 
 script_dir=$(cd "$(dirname "$0")" && pwd)
 path=
-for tool in gh jq python3 container; do
+for tool in python3 gh jq container; do
   bin=$(command -v "$tool") || { echo "$tool is required" >&2; exit 1; }
   path="$path$(dirname "$bin"):"
 done
@@ -44,7 +44,7 @@ path="${path}/usr/bin:/bin:/usr/sbin:/sbin"
 interval=${POLL_INTERVAL:-30}
 case "$interval" in ''|*[!0-9]*) echo "POLL_INTERVAL must be seconds" >&2; exit 1;; esac
 [ "$interval" -ge 10 ] || { echo "POLL_INTERVAL must be at least 10" >&2; exit 1; }
-python3 "$script_dir/config.py" --check "$script_dir/runners.conf"
+python3 "$script_dir/config.py" --check "$script_dir/runners.toml"
 mkdir -p "$agent_dir" "$log_dir"
 
 # launchd does not start a second copy while one pass is in operation, so a

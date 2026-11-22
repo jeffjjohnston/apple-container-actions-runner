@@ -1,0 +1,9 @@
+[[runners]]
+name = "linux-1"
+repository = "OWNER/PRIVATE-REPO"
+labels = ["apple-container"]
+enabled = false
+
+cpus = 2
+memory = "4G"
+storage = "disposable"

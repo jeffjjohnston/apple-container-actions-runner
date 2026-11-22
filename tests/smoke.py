@@ -29,7 +29,7 @@ def wait_for(check, deadline, message):
 
 def main(repo):
     installation = (STATE / "installation").read_text().strip()
-    owned = {"gh-" + row.split("|")[0] for row in slots(ROOT / "runners.conf", installation)
+    owned = {"gh-" + row.split("|")[0] for row in slots(ROOT / "runners.toml", installation)
              if row.split("|")[1] == repo.lower() and "apple-container" in row.split("|")[2].split(",")}
     if not owned:
         sys.exit("Enable a matching apple-container slot and install the poller first.")

@@ -10,15 +10,28 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 export PATH="$here/tests/stubs:$PATH"
 passed=0
 
+slot_table() {
+  cat <<EOF
+[[runners]]
+name = "$1"
+repository = "${2:-o/test}"
+labels = ["${3:-dind}"]
+enabled = ${4:-true}
+cpus = 8
+memory = "4G"
+storage = "disposable"
+EOF
+}
+
 setup() {
   tmp=$(mktemp -d)
   export FIXTURE_DIR="$tmp/fx" CALLS_LOG="$tmp/calls" LOG_DIR="$tmp/logs" \
-    RUNNERS_CONF="$tmp/runners.conf" IMAGE=gh-runner-arm64:test
+    RUNNERS_CONF="$tmp/runners.toml" IMAGE=gh-runner-arm64:test
   export GH_TOKEN=test-only STATE_DIR="$tmp/state"
   mkdir -p "$FIXTURE_DIR" "$LOG_DIR/jobs" "$STATE_DIR"
   printf 0123456789abcdef > "$STATE_DIR/installation"
   : > "$CALLS_LOG"
-  echo 'test-1|o/test|dind|8|4G||yes|disposable' > "$RUNNERS_CONF"
+  slot_table test-1 > "$RUNNERS_CONF"
   echo '{"runner":{"id":77,"name":"gh-0123456789abcdef-a4fdc28e4580-test-1"},"encoded_jit_config":"FAKEJIT"}' > "$FIXTURE_DIR/gh-jit.json"
   runs; runners
 }
@@ -139,7 +152,7 @@ runner_already_idle() {
   not_called 'container run'; not_called 'container stop'; not_called 'DELETE'
 }
 busy_runner_not_idle() {
-  printf '%s\n' 'test-1|o/test|dind|8|4G||yes|disposable' 'test-2|o/test|dind|8|4G||yes|disposable' > "$RUNNERS_CONF"
+  slot_table test-2 >> "$RUNNERS_CONF"
   runs 1; jobs self-hosted,dind
   containers gh-0123456789abcdef-a4fdc28e4580-test-1:running:400; runners 5:gh-0123456789abcdef-a4fdc28e4580-test-1:true
   run_poll
@@ -162,7 +175,7 @@ extra_label_ignored() {
   not_called 'container run'
 }
 disabled_slot() {
-  printf '%s\n' '# comment' '' 'off-1|o/off|dind|8|4G||no|disposable' 'test-1|o/test|dind|8|4G||yes|disposable' > "$RUNNERS_CONF"
+  slot_table off-1 o/off dind false >> "$RUNNERS_CONF"
   runs 1; jobs self-hosted,dind
   run_poll
   not_called 'o/off'
@@ -342,14 +355,33 @@ missing_config() {
 }
 
 warm_storage() {
+  echo 'buildkit_gc = "2GB"' >> "$RUNNERS_CONF"
   sed -i '' 's/disposable/warm/' "$RUNNERS_CONF"
   runs 1; jobs dind
   run_poll
+  called 'container run .*BUILDKIT_GC=2GB'
   called 'volume create .*test-1-docker'
   called 'container run .*test-1-home:/home/runner'
 }
+invalid_toml_types() {
+  local assignment key
+  for assignment in 'cpus = true' 'enabled = "false"' 'labels = "dind"' 'labels = ["dind,gpu"]'; do
+    key=${assignment%% *}
+    slot_table test-1 | sed "s/^$key = .*/$assignment/" > "$RUNNERS_CONF"
+    run_poll
+    [ "$rc" -ne 0 ] || fail "accepted $assignment"
+    not_called '^gh |^container '
+  done
+}
+unknown_field() {
+  echo 'enable = true' >> "$RUNNERS_CONF"
+  run_poll
+  [ "$rc" -ne 0 ] || fail "accepted misspelled field"
+  output 'unknown fields: enable'
+  not_called '^gh |^container '
+}
 bad_config() {
-  echo 'other|o/test|gpu|2|4G||yes|warm' >> "$RUNNERS_CONF"
+  slot_table other o/test gpu >> "$RUNNERS_CONF"
   run_poll
   [ "$rc" -ne 0 ] || fail "accepted mixed labels"
   not_called '^gh |^container '
@@ -389,12 +421,12 @@ empty_inventory() {
   not_called '^gh '
 }
 all_disabled() {
-  cp "$here/runners.conf.example" "$RUNNERS_CONF"
+  cp "$here/runners.toml.example" "$RUNNERS_CONF"
   run_poll
   [ "$rc" -eq 0 ] || fail "disabled configuration failed"
   not_called '^gh |^container '
 }
-all="foreign_installation empty_inventory all_disabled warm_storage bad_config malformed_inventory next_page rate_limited idle_no_jobs in_progress_run run_in_both_lists reap_delete_refused
+all="invalid_toml_types unknown_field foreign_installation empty_inventory all_disabled warm_storage bad_config malformed_inventory next_page rate_limited idle_no_jobs in_progress_run run_in_both_lists reap_delete_refused
 container_ls_fails offline_runner_removed offline_young_kept
 unregistered_first_seen unregistered_stuck_removed marker_cleared one_job_starts_slot jit_not_in_output two_jobs_one_slot
 runner_already_idle busy_runner_not_idle hosted_job_ignored label_case

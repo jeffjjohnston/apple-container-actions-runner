@@ -3,7 +3,7 @@
 set -uo pipefail
 : "${INSTALLATION:?use poll.py}"
 here=$(cd "$(dirname "$0")" && pwd)
-conf=${RUNNERS_CONF:-$here/runners.conf}
+conf=${RUNNERS_CONF:-$here/runners.toml}
 log_dir=${LOG_DIR:-$HOME/Library/Logs/apple-container-actions-runner}
 image=${IMAGE:-apple-container-actions-runner:$(sed -n 's/^ARG RUNNER_VERSION=//p' "$here/image/Dockerfile")}
 

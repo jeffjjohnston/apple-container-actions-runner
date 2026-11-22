@@ -6,7 +6,7 @@ Each guest runs its own Docker daemon, so workflows can use Docker actions and `
 
 ## Try one job
 
-1. Use an Apple silicon Mac with macOS 26 or later and a logged-in user session that will stay awake. Install Apple’s `container` CLI, GitHub CLI (`gh`), `jq`, and Python 3.8+. Use a stable checkout location. The LaunchAgent runs as the Mac user and starts again after login. The reference host used macOS 27.2.1 and `container` 1.7.1. [Apple installation instructions](https://github.com/apple/container#get-started)
+1. Use an Apple silicon Mac with macOS 26 or later and a logged-in user session that will stay awake. Install Apple’s `container` CLI, GitHub CLI (`gh`), `jq`, and Python 3.11+. Use a stable checkout location. The LaunchAgent runs as the Mac user and starts again after login. The reference host used macOS 27.2.1 and `container` 1.7.1. [Apple installation instructions](https://github.com/apple/container#get-started)
 
 2. Choose a private scratch repository on GitHub.com whose workflows and dependencies you trust. The host credential needs **Actions read** to inspect runs and jobs, and **Administration write** to manage repository JIT runners. Use a dedicated Mac account with a fine-grained token limited to that repository. In Keychain Access, create a password item in that user’s login keychain. Set the item name to `apple-container-actions-runner`, the account to the output of `id -un`, and the password to the token. Test access from a terminal with the command below and grant keychain access when prompted. The poller supplies this credential only to its GitHub CLI calls. [GitHub runner permissions](https://docs.github.com/en/rest/actions/self-hosted-runners)
 
@@ -21,10 +21,10 @@ Each guest runs its own Docker daemon, so workflows can use Docker actions and `
    ```sh
    container system start --enable-kernel-install
    ./build.sh
-   cp runners.conf.example runners.conf
+   cp runners.toml.example runners.toml
    ```
 
-   In `runners.conf`, replace `OWNER/PRIVATE-REPO` with the scratch repository and change `no` to `yes`. Leave `disposable` selected for the first run. Install the poller and check its host log.
+   In `runners.toml`, replace `OWNER/PRIVATE-REPO` with the scratch repository and set `enabled = true`. Leave `disposable` selected for the first run. Install the poller and check its host log.
 
    ```sh
    ./install-poller.sh

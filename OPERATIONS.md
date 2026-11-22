@@ -2,14 +2,22 @@
 
 ## Slots and scheduling
 
-Each line in `runners.conf` defines one concurrent VM. Fields are pipe-separated.
+Each `[[runners]]` table in `runners.toml` defines one concurrent VM. To add another slot, copy the table and give it a unique lowercase name. This example retains a trusted slot’s workspace and Docker data between jobs.
 
-```text
-slot|owner/repo|additional-labels|cpus|memory|buildkit-gc|enabled|storage
-linux-1|example/private-ci|apple-container|2|4G|2GB|yes|disposable
+```toml
+[[runners]]
+name = "linux-2"
+repository = "example/private-ci"
+labels = ["apple-container"]
+enabled = true
+
+cpus = 2
+memory = "4G"
+storage = "warm"
+buildkit_gc = "2GB"
 ```
 
-Use a distinct lowercase slot name for each row. Enabled slots in the same repo must share the same additional labels. Separate labels with commas. The poller adds `self-hosted,linux,ARM64` and compares labels case-insensitively. CPU counts are whole numbers and memory accepts `M` or `G`. The optional BuildKit target accepts `MB` or `GB` and covers only build cache. Set `enabled` to `yes` or `no` and storage to `disposable` or `warm`. The complete file is validated on each pass.
+Enabled slots in a repository must share the same additional labels. The poller adds `self-hosted,linux,ARM64` and compares labels case-insensitively. Use a positive integer for CPUs and `M` or `G` for memory. The optional `buildkit_gc` target accepts `MB` or `GB` and covers only build cache. The complete file is validated on each pass.
 
 The name of each registration and VM is `gh-<installation>-<repo-hash>-<slot>`. Each Mac account generates its own installation ID under `~/Library/Application Support/apple-container-actions-runner`. Keep the ID on that machine. Repository or slot renames create a new namespace. The installer manages one poller per Mac account. A host-side lock serializes manual and scheduled passes.
 
@@ -24,7 +32,7 @@ At the default 30-second interval an idle repo costs about 240 REST requests/hou
 
 ## Drain, upgrade, and reclaim disk
 
-Pause dispatches for the affected workflows. Allow running jobs to finish and leave the slot enabled until its VM has exited. An idle runner left after a cancellation is normally reaped after about two minutes. Confirm with `container ls -a`, then set the slot to `no`. Disabled slots are skipped. To uninstall the schedule, run `./install-poller.sh --uninstall`. The image, logs, installation ID, and any warm volumes remain.
+Pause dispatches for the affected workflows. Allow running jobs to finish and leave the slot enabled until its VM has exited. An idle runner left after a cancellation is normally reaped after about two minutes. Confirm with `container ls -a`, then set `enabled = false`. Disabled slots are skipped. To uninstall the schedule, run `./install-poller.sh --uninstall`. The image, logs, installation ID, and any warm volumes remain.
 
 For a runner update, change the version and corresponding upstream Linux ARM64 SHA-256 in `image/Dockerfile`, rebuild, and run the private probe. The next VM uses the versioned tag. Rebuild regularly for base image and Docker updates. The build can leave Apple’s shared builder VM running. Use `container builder status` and stop it with `container builder stop` when other builds have finished. [Runner releases](https://github.com/actions/runner/releases)
 
