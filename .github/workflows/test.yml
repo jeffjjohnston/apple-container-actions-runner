@@ -1,0 +1,10 @@
+name: Poller tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: tests/poll_test.sh

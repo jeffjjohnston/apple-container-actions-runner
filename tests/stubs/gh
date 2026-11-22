@@ -1,0 +1,24 @@
+#!/bin/bash
+# Test stub for `gh`. It records the call, then answers from $FIXTURE_DIR.
+# A fixture named gh-<key>.<n>.json (or .exit, .err) answers only call
+# number <n> for that key; gh-<key>.json answers every other call.
+echo "gh $*" >> "$CALLS_LOG"
+case "$*" in
+  *generate-jitconfig*) key=jit; cat >/dev/null ;;
+  *"-X DELETE"*)        key=delete ;;
+  */jobs\?*)            key=jobs ;;
+  */runs\?*)            key=runs ;;
+  */runners\?*)         key=runners ;;
+  *)                    key=unknown ;;
+esac
+n=$(( $(cat "$FIXTURE_DIR/.count-$key" 2>/dev/null || echo 0) + 1 ))
+echo "$n" > "$FIXTURE_DIR/.count-$key"
+base="$FIXTURE_DIR/gh-$key"
+[ -e "$base.$n.json" ] || [ -e "$base.$n.exit" ] && base="$base.$n"
+printf 'HTTP/2.0 200 OK\n'
+[ ! -f "$base.headers" ] || cat "$base.headers"
+printf '\n'
+[ -f "$base.json" ] && cat "$base.json"
+[ -f "$base.err" ] && cat "$base.err" >&2
+[ -f "$base.exit" ] && exit "$(cat "$base.exit")"
+exit 0

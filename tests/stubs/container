@@ -1,0 +1,15 @@
+#!/bin/bash
+# Test stub for Apple `container`. It records the call, then answers from
+# $FIXTURE_DIR. For `run`, it also records the JIT config that it received in
+# its environment, which is the only correct way for the config to arrive.
+echo "container $*" >> "$CALLS_LOG"
+case "$1 ${2:-}" in
+  "system status") cat "$FIXTURE_DIR/container-status.txt" 2>/dev/null || echo "status              running" ;;
+  "system start")  ;;
+  "ls "*|"list "*) cat "$FIXTURE_DIR/container-ls.json" 2>/dev/null || echo "[]" ;;
+  "volume ls")     cat "$FIXTURE_DIR/container-volumes.txt" 2>/dev/null ;;
+  "volume create") ;;
+  "run "*)         printf '%s' "${JIT_CONFIG:-}" > "$FIXTURE_DIR/.jit-seen" ;;
+esac
+[ -f "$FIXTURE_DIR/container-$1.exit" ] && exit "$(cat "$FIXTURE_DIR/container-$1.exit")"
+exit 0

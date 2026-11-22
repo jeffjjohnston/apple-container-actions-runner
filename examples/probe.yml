@@ -1,0 +1,24 @@
+name: Apple container probe
+run-name: apple-container-probe-${{ inputs.probe_id }}
+on:
+  workflow_dispatch:
+    inputs:
+      probe_id:
+        description: Unique ID supplied by the smoke test
+        required: true
+        type: string
+permissions: {}
+jobs:
+  probe:
+    runs-on: [self-hosted, linux, ARM64, apple-container]
+    timeout-minutes: 5
+    services:
+      web:
+        image: nginx:alpine
+        ports:
+          - 127.0.0.1:18080:80
+    steps:
+      - name: Check the Linux ARM64 guest and its service
+        run: |
+          test "$(uname -sm)" = "Linux aarch64"
+          curl --retry 10 --retry-connrefused --fail --silent http://127.0.0.1:18080/ > /dev/null
