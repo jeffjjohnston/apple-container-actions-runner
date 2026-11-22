@@ -101,6 +101,11 @@ get_jit() {
 start_slot() {
   local slot=$1 repo=$2 v job_dir volumes
   local -a mounts
+  local launch_error
+  if ! container image inspect "$image" >/dev/null; then
+    log "error $slot: cannot inspect local image $image; run ./build.sh"
+    return 1
+  fi
   mounts=()
   if [ "$7" = warm ]; then
     volumes=$(container volume ls -q) || return 1
@@ -120,17 +125,18 @@ start_slot() {
   # config is not in an argument list or a log. `container` keeps the
   # environment in its config file for the container until the container is
   # removed. The config is of no use after the runner took its one job.
-  if JIT_CONFIG=$jit container run -d --rm --name "gh-$slot" \
+  if launch_error=$(JIT_CONFIG=$jit container run -d --rm --name "gh-$slot" \
       --cap-add ALL --read-only-path NONE -c "$4" -m "$5" \
       ${mounts[@]+"${mounts[@]}"} -v "$job_dir:/var/log/gh-runner" \
       -e JIT_CONFIG -e "STORAGE=$7" -e "BUILDKIT_GC=$6" \
       -e RUN_LOG=/var/log/gh-runner/runner.log \
-      --progress none "$image" >/dev/null 2>&1; then
+      --progress none "$image" 2>&1 >/dev/null); then
     log "start $slot"
   else
     # Without this, each pass that fails would leave one more registration.
     delete_runner "$repo" "$jit_runner_id"
-    log "error $slot: container run failed"
+    rmdir "$job_dir" 2>/dev/null || true  # Keep any diagnostics already written.
+    log "error $slot: container run failed: ${launch_error//"$jit"/[redacted]}"
     return 1
   fi
 }

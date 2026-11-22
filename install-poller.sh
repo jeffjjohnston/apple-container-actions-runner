@@ -1,12 +1,12 @@
 #!/bin/bash
 #
-# Installs the launchd agent that runs poll.sh at the configured interval. Run it again
+# Installs the launchd agent that runs poll.py at the configured interval. Run it again
 # after this directory moves or after gh, jq or container move.
 #
 #   ./install-poller.sh              install or refresh the agent
 #   ./install-poller.sh --uninstall  remove the agent
 #
-# THE AGENT IS A USER AGENT, NOT A DAEMON. poll.sh uses the login keychain and the
+# THE AGENT IS A USER AGENT, NOT A DAEMON. poll.py uses the login keychain and the
 # per-user `container` service, and both need a login session. The runners
 # therefore come back after a reboot when you log in.
 set -euo pipefail
@@ -70,5 +70,5 @@ plutil -lint "$agent"
 
 launchctl bootout "$domain/$label" 2>/dev/null || true
 launchctl bootstrap "$domain" "$agent"
-echo "Installed $label: poll.sh at the configured interval"
+echo "Installed $label: poll.py at the configured interval"
 echo "Log: $log_dir/poller.log"

@@ -1,0 +1,4 @@
+#!/bin/bash
+# The suite exercises keychain selection without touching the host keychain.
+[ "$1" = find-generic-password ] || exit 1
+echo fixture-keychain-token

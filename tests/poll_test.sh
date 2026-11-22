@@ -27,7 +27,7 @@ setup() {
   tmp=$(mktemp -d)
   export FIXTURE_DIR="$tmp/fx" CALLS_LOG="$tmp/calls" LOG_DIR="$tmp/logs" \
     RUNNERS_CONF="$tmp/runners.toml" IMAGE=gh-runner-arm64:test
-  export GH_TOKEN=test-only STATE_DIR="$tmp/state"
+  export GITHUB_TOKEN=test-other GH_TOKEN=test-dispatcher STATE_DIR="$tmp/state"
   mkdir -p "$FIXTURE_DIR" "$LOG_DIR/jobs" "$STATE_DIR"
   printf 0123456789abcdef > "$STATE_DIR/installation"
   : > "$CALLS_LOG"
@@ -224,10 +224,28 @@ jit_other_error() {
   not_called 'container run'
   output 'error 0123456789abcdef-a4fdc28e4580-test-1'
 }
+missing_image() {
+  runs 1; jobs self-hosted,dind
+  echo 1 > "$FIXTURE_DIR/container-image.exit"
+  run_poll
+  output 'cannot inspect local image'
+  not_called 'generate-jitconfig|container run|DELETE'
+}
+corrupt_backoff() {
+  printf 'incomplete' > "$STATE_DIR/retry-at"
+  run_poll
+  output 'Ignoring invalid backoff'
+  called 'actions/runs'
+  [ ! -e "$STATE_DIR/retry-at" ] || fail "bad deadline retained"
+}
 run_fails() {
   runs 1; jobs self-hosted,dind
+  echo 'mount error FAKEJIT' > "$FIXTURE_DIR/container-run.err"
   echo 1 > "$FIXTURE_DIR/container-run.exit"
   run_poll
+  output 'mount error'
+  [[ "$out" != *FAKEJIT* ]] || fail "JIT config in error"
+  [ -z "$(ls -A "$LOG_DIR/jobs")" ] || fail "empty job directory retained"
   called '-X DELETE repos/o/test/actions/runners/77$'
   output 'error 0123456789abcdef-a4fdc28e4580-test-1'
 }
@@ -426,7 +444,7 @@ all_disabled() {
   [ "$rc" -eq 0 ] || fail "disabled configuration failed"
   not_called '^gh |^container '
 }
-all="invalid_toml_types unknown_field foreign_installation empty_inventory all_disabled warm_storage bad_config malformed_inventory next_page rate_limited idle_no_jobs in_progress_run run_in_both_lists reap_delete_refused
+all="missing_image corrupt_backoff invalid_toml_types unknown_field foreign_installation empty_inventory all_disabled warm_storage bad_config malformed_inventory next_page rate_limited idle_no_jobs in_progress_run run_in_both_lists reap_delete_refused
 container_ls_fails offline_runner_removed offline_young_kept
 unregistered_first_seen unregistered_stuck_removed marker_cleared one_job_starts_slot jit_not_in_output two_jobs_one_slot
 runner_already_idle busy_runner_not_idle hosted_job_ignored label_case

@@ -2,6 +2,7 @@
 # Test stub for `gh`. It records the call, then answers from $FIXTURE_DIR.
 # A fixture named gh-<key>.<n>.json (or .exit, .err) answers only call
 # number <n> for that key; gh-<key>.json answers every other call.
+[ "${GH_TOKEN:-}" = fixture-keychain-token ] || exit 1
 echo "gh $*" >> "$CALLS_LOG"
 case "$*" in
   *generate-jitconfig*) key=jit; cat >/dev/null ;;

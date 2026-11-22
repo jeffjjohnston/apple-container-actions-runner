@@ -25,6 +25,8 @@ At the default 30-second interval an idle repo costs about 240 REST requests/hou
 
 ## A job stays queued
 
+GitHub fails a job after 24 hours in the runner queue. [Routing reference](https://docs.github.com/en/actions/reference/runners/self-hosted-runners#routing-precedence-for-self-hosted-runners)
+
 1. Check that the Mac is awake and the user is logged in. Inspect `launchctl print "gui/$(id -u)/local.apple-container-actions-runner.poller"`, `container system status`, and `container ls -a`.
 2. Check the configured repository and every requested label. Confirm the image tag from `./build.sh` appears in `container image ls`. The installer records executable paths, so reinstall after moving the checkout or tools.
 3. Read `~/Library/Logs/apple-container-actions-runner/poller.log` for API errors, rate limiting, launch failures, and reaping. A quiet idle pass is normal. Check `jobs/gh-*/runner.log` in the same log directory for guest startup and shutdown output. Check the Actions run for step output. The poller prunes job directories older than 14 days during enabled passes. Manage or rotate the host poller log separately.
@@ -34,9 +36,13 @@ At the default 30-second interval an idle repo costs about 240 REST requests/hou
 
 Pause dispatches for the affected workflows. Allow running jobs to finish and leave the slot enabled until its VM has exited. An idle runner left after a cancellation is normally reaped after about two minutes. Confirm with `container ls -a`, then set `enabled = false`. Disabled slots are skipped. To uninstall the schedule, run `./install-poller.sh --uninstall`. The image, logs, installation ID, and any warm volumes remain.
 
-For a runner update, change the version and corresponding upstream Linux ARM64 SHA-256 in `image/Dockerfile`, rebuild, and run the private probe. The next VM uses the versioned tag. Rebuild regularly for base image and Docker updates. The build can leave Apple’s shared builder VM running. Use `container builder status` and stop it with `container builder stop` when other builds have finished. [Runner releases](https://github.com/actions/runner/releases)
+The Ubuntu ARM64 image includes the Actions runner, Git, curl, jq, and a private Docker daemon with Buildx and Compose. For workloads that need a compiler, Python, or the GitHub CLI, add the required packages to `image/Dockerfile` and run `./build.sh`. The guest uses Ubuntu’s default IP address selection. Test your workload with the rebuilt image before enabling more slots.
+
+For a runner update, change the version and corresponding upstream Linux ARM64 SHA-256 in `image/Dockerfile`, rebuild, and run the private probe. The next VM uses the versioned tag. Review the runner pin at least monthly. GitHub documents a 63-day update window when automatic updates are disabled. A critical security update can prevent job assignment sooner. Check the version’s registration and runtime deprecation dates for your repository. Rebuild for base image and Docker updates as well. [Runner update policy](https://docs.github.com/en/actions/reference/runners/self-hosted-runners#runner-software-updates-on-self-hosted-runners) The build can leave Apple’s shared builder VM running. Use `container builder status` and stop it with `container builder stop` when other builds have finished. [Runner releases](https://github.com/actions/runner/releases)
 
 For warm slots, the entrypoint prunes unused anonymous Docker volumes and old build cache, stops nested containers and Docker, removes nested cgroups, then trims both mounted filesystems. This order matters on Apple container 1.7.1. BuildKit GC cannot limit the total size of the runner home, Docker images, or named volumes. After draining a slot, list its exact volumes with `container volume ls`. To permanently discard its warm data, use `container volume rm <slot-prefix>-docker <slot-prefix>-home`, substituting the actual names. The poller recreates them on the next warm start.
+
+Warm volume files change frequently and can increase Time Machine backup usage. For disposable CI caches, consider excluding individual slot volume directories under `~/Library/Application Support/com.apple.container/volumes/` in Time Machine settings. Check the paths and backup requirements of other Apple containers before choosing an exclusion.
 
 ## Sizing observations
 

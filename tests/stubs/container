@@ -2,6 +2,8 @@
 # Test stub for Apple `container`. It records the call, then answers from
 # $FIXTURE_DIR. For `run`, it also records the JIT config that it received in
 # its environment, which is the only correct way for the config to arrive.
+[ -z "${GH_TOKEN:-}${GITHUB_TOKEN:-}" ] || exit 1
+[ ! -f "$FIXTURE_DIR/container-$1.err" ] || cat "$FIXTURE_DIR/container-$1.err" >&2
 echo "container $*" >> "$CALLS_LOG"
 case "$1 ${2:-}" in
   "system status") cat "$FIXTURE_DIR/container-status.txt" 2>/dev/null || echo "status              running" ;;

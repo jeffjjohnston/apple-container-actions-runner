@@ -2,15 +2,18 @@
 
 Run trusted GitHub Actions jobs on an Apple silicon Mac. The guest is Ubuntu Linux ARM64. An outbound poller finds queued jobs, asks GitHub for a just-in-time (JIT) runner, and starts one lightweight VM per available slot. GitHub assigns one matching job to each runner. The guest exits after the job and Apple’s `container` removes it. Xcode and Apple SDK builds require a macOS runner.
 
+This is an independent community project. Apple and GitHub do not sponsor or maintain it.
+
 Each guest runs its own Docker daemon, so workflows can use Docker actions and `services:` with localhost ports. The default slot discards the workspace and Docker data after every job. The Mac retains the runner image, host state, and diagnostic logs.
 
 ## Try one job
 
 1. Use an Apple silicon Mac with macOS 26 or later and a logged-in user session that will stay awake. Install Apple’s `container` CLI, GitHub CLI (`gh`), `jq`, and Python 3.11+. Use a stable checkout location. The LaunchAgent runs as the Mac user and starts again after login. The reference host used macOS 27.2.1 and `container` 1.7.1. [Apple installation instructions](https://github.com/apple/container#get-started)
 
-2. Choose a private scratch repository on GitHub.com whose workflows and dependencies you trust. The host credential needs **Actions read** to inspect runs and jobs, and **Administration write** to manage repository JIT runners. Use a dedicated Mac account with a fine-grained token limited to that repository. In Keychain Access, create a password item in that user’s login keychain. Set the item name to `apple-container-actions-runner`, the account to the output of `id -un`, and the password to the token. Test access from a terminal with the command below and grant keychain access when prompted. The poller supplies this credential only to its GitHub CLI calls. [GitHub runner permissions](https://docs.github.com/en/rest/actions/self-hosted-runners)
+2. Choose a private scratch repository on GitHub.com whose workflows and dependencies you trust. The host credential needs **Actions read** to inspect runs and jobs, and **Administration write** to manage repository JIT runners. Use a dedicated Mac account with a fine-grained token limited to that repository. Run the first command below to create the login Keychain item and enter the token at the password prompt. Test access from a terminal with the command below and grant keychain access when prompted. The poller supplies this credential only to its GitHub CLI calls. [GitHub runner permissions](https://docs.github.com/en/rest/actions/self-hosted-runners)
 
    ```sh
+   security add-generic-password -a "$(id -un)" -s apple-container-actions-runner -w
    security find-generic-password -a "$(id -un)" -s apple-container-actions-runner -w >/dev/null
    ```
 
@@ -31,7 +34,7 @@ Each guest runs its own Docker daemon, so workflows can use Docker actions and `
    tail -F ~/Library/Logs/apple-container-actions-runner/poller.log
    ```
 
-5. In another terminal, dispatch the probe. Use a separate dispatcher credential with **Actions write** and **Administration read** for the scratch repo. For example, set `GH_TOKEN` in that terminal through your credential manager. Leave the poller’s credential in its keychain. Use a quiet scratch repo so the named slot can fully exit between jobs.
+5. In another terminal, dispatch the probe. Use a separate dispatcher credential with **Actions write** and **Administration read** for the scratch repo. For example, set `GH_TOKEN` in that terminal through your credential manager. Both the LaunchAgent and foreground poller use the dedicated Keychain item, including when the dispatcher token is set in the shell. Use a quiet scratch repo so the named slot can fully exit between jobs.
 
    ```sh
    tests/smoke.py OWNER/PRIVATE-REPO

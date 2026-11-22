@@ -4,9 +4,10 @@ import fcntl
 import os
 import subprocess
 import sys
-import time
 import uuid
 from pathlib import Path
+
+from api import backoff_active
 
 ROOT = Path(__file__).resolve().parent
 STATE = Path(os.environ.get("STATE_DIR", Path.home() / "Library/Application Support/apple-container-actions-runner"))
@@ -29,10 +30,13 @@ def main():
         if len(installation) != 16 or any(c not in "0123456789abcdef" for c in installation):
             sys.exit(f"Invalid installation identity in {identity}")
         retry = STATE / "retry-at"
-        if retry.exists() and int(retry.read_text()) > time.time():
+        if backoff_active(retry):
             return 0
+        env = dict(os.environ, STATE_DIR=str(STATE), INSTALLATION=installation)
+        for key in ("GH_TOKEN", "GITHUB_TOKEN"):
+            env.pop(key, None)
         return subprocess.call(["/bin/bash", str(ROOT / "poll.sh")],
-                               env=dict(os.environ, STATE_DIR=str(STATE), INSTALLATION=installation),
+                               env=env,
                                pass_fds=(lock.fileno(),))
 
 

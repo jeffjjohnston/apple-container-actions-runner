@@ -9,19 +9,28 @@ import time
 from pathlib import Path
 
 
+def backoff_active(retry):
+    try:
+        return int(retry.read_text()) > time.time()
+    except FileNotFoundError:
+        return False
+    except ValueError:
+        print(f"Ignoring invalid backoff deadline in {retry}", file=sys.stderr)
+        retry.unlink(missing_ok=True)
+        return False
+
+
 def main(method, endpoint, field=None):
     retry = Path(os.environ["STATE_DIR"]) / "retry-at"
-    if retry.exists() and int(retry.read_text()) > time.time():
+    if backoff_active(retry):
         sys.exit("GitHub rate-limit backoff active")
-    env = os.environ.copy()
-    if not env.get("GH_TOKEN"):
-        secret = subprocess.run(
-            ["/usr/bin/security", "find-generic-password", "-a", getpass.getuser(),
-             "-s", "apple-container-actions-runner", "-w"],
-            stdout=subprocess.PIPE, text=True)
-        if secret.returncode or not secret.stdout.strip():
-            sys.exit("Cannot read the poller credential from the login keychain")
-        env["GH_TOKEN"] = secret.stdout.strip()
+    secret = subprocess.run(
+        ["security", "find-generic-password", "-a", getpass.getuser(),
+         "-s", "apple-container-actions-runner", "-w"],
+        stdout=subprocess.PIPE, text=True)
+    if secret.returncode or not secret.stdout.strip():
+        sys.exit("Cannot read the poller credential from the login keychain")
+    env = dict(os.environ, GH_TOKEN=secret.stdout.strip())
     items = []
     page = 1
     while True:

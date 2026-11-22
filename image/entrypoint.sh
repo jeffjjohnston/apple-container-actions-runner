@@ -8,7 +8,6 @@ fi
 
 : "${JIT_CONFIG:?JIT_CONFIG is required; poll.sh supplies it}"
 
-
 # The config is a credential. Keep it in a shell variable only, so that it is
 # not in the environment of dockerd or of the job.
 jit=$JIT_CONFIG
@@ -106,19 +105,10 @@ cleanup() {
   fi
 }
 
-# WHY THE VOLUME PRUNE EXISTS. A CI job declares `services:` with postgres.
-# The postgres image declares VOLUME /var/lib/postgresql/data, so the service
-# container gets a new anonymous volume. The runner removes that container
-# with `docker rm --force`, which takes no -v, so the volume stays. Each job
-# leaks about 550 MB. Measured before this cleanup existed: 99-103 stale
-# volumes per runner, 117 GB across three runners, after nine days.
-#
-# `docker volume prune` removes anonymous volumes only.
+# Service containers can leave anonymous volumes in a warm Docker store.
 cleanup_after_job() {
   cleanup volume prune -f
   cleanup buildx prune --builder default --force --filter until=168h
-
-
 }
 
 # THE DOCKER CGROUPS MUST BE GONE BEFORE THIS CONTAINER STOPS. While a child
@@ -143,11 +133,7 @@ shutdown_docker() {
   find /sys/fs/cgroup -mindepth 1 -depth -type d -exec rmdir {} \; 2>/dev/null
 }
 
-# GIVE THE DELETED BLOCKS BACK TO THE MAC. Each volume is a sparse file on the
-# host. ext4 does not tell the host which blocks it freed, so without a trim
-# the file only grows. Measured: a home volume with 7.8 GB of data held 16 GB
-# on the Mac; one fstrim made it 7.9 GB. A trim of all eleven volumes took 4 s.
-# This runs after shutdown_docker, so the Docker volume is quiet.
+# Return freed ext4 blocks to the Mac after the nested daemon has stopped.
 trim_volumes() {
   local dir out
   for dir in /home/runner /var/lib/docker; do
